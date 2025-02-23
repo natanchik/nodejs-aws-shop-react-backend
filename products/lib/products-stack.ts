@@ -42,5 +42,15 @@ export class ProductsStack extends cdk.Stack {
       value: api.url,
       description: 'API Gateway URL',
     });
+
+    const addSwagger = new lambda.Function(this, 'SwaggerHandler', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'swagger.handler',
+      code: lambda.Code.fromAsset('lambda'),
+      timeout: cdk.Duration.seconds(30),
+    });
+
+    api.root.addResource('docs').addMethod('GET', new apigateway.LambdaIntegration(addSwagger));
+    api.root.addResource('swagger.json').addMethod('GET', new apigateway.LambdaIntegration(addSwagger));
   }
 }
