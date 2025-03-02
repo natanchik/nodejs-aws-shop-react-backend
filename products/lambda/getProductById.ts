@@ -1,9 +1,13 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { products } from './mockData';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
+
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
-    const { productId } = event.pathParameters || {};
+    const productId = event.pathParameters?.productId;
 
     if (!productId) {
       return {
@@ -16,9 +20,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       };
     }
 
-    const product = products.find((p) => p.id === productId);
+    const productResponse = await docClient.send(
+      new GetCommand({
+        TableName: 'products',
+        Key: { id: productId },
+      }),
+    );
 
-    if (!product) {
+    if (!productResponse.Item) {
       return {
         statusCode: 404,
         headers: {
@@ -29,13 +38,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       };
     }
 
+    const stockResponse = await docClient.send(
+      new GetCommand({
+        TableName: 'stocks',
+        Key: { product_id: productId },
+      }),
+    );
+
+    const joinedProduct = {
+      id: productResponse.Item.id,
+      title: productResponse.Item.title,
+      description: productResponse.Item.description,
+      price: productResponse.Item.price,
+      count: stockResponse.Item?.count || 0,
+    };
+
     return {
       statusCode: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Credentials': true,
       },
-      body: JSON.stringify(product),
+      body: JSON.stringify(joinedProduct),
     };
   } catch (error) {
     return {
