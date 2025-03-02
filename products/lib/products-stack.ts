@@ -12,11 +12,18 @@ export class ProductsStack extends cdk.Stack {
     const productsTable = dynamodb.Table.fromTableName(this, 'ImportedProductsTable', 'products');
     const stocksTable = dynamodb.Table.fromTableName(this, 'ImportedStocksTable', 'stocks');
 
+    const lambdaEnvironment = {
+      PRODUCTS_TABLE: productsTable.tableName,
+      STOCKS_TABLE: stocksTable.tableName,
+      REGION: cdk.Stack.of(this).region,
+    };
+
     const getProductsList = new lambda.Function(this, 'GetProductsListHandler', {
       runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset('lambda'),
       handler: 'getProductsList.handler',
       timeout: cdk.Duration.seconds(30),
+      environment: lambdaEnvironment,
       initialPolicy: [
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
@@ -31,6 +38,7 @@ export class ProductsStack extends cdk.Stack {
       code: lambda.Code.fromAsset('lambda'),
       handler: 'getProductById.handler',
       timeout: cdk.Duration.seconds(30),
+      environment: lambdaEnvironment,
       initialPolicy: [
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,

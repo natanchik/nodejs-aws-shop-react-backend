@@ -9,13 +9,13 @@ export const handler: APIGatewayProxyHandler = async () => {
   try {
     const productsResponse = await docClient.send(
       new ScanCommand({
-        TableName: 'products',
+        TableName: process.env.PRODUCTS_TABLE!,
       }),
     );
 
     const stocksResponse = await docClient.send(
       new ScanCommand({
-        TableName: 'stocks',
+        TableName: process.env.STOCKS_TABLE!,
       }),
     );
 

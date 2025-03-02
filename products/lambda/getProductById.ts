@@ -22,7 +22,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const productResponse = await docClient.send(
       new GetCommand({
-        TableName: 'products',
+        TableName: process.env.PRODUCTS_TABLE!,
         Key: { id: productId },
       }),
     );
@@ -40,7 +40,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const stockResponse = await docClient.send(
       new GetCommand({
-        TableName: 'stocks',
+        TableName: process.env.STOCKS_TABLE!,
         Key: { product_id: productId },
       }),
     );
