@@ -2,26 +2,56 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class ProductsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    const productsTable = dynamodb.Table.fromTableName(this, 'ImportedProductsTable', 'products');
+    const stocksTable = dynamodb.Table.fromTableName(this, 'ImportedStocksTable', 'stocks');
+
+    const lambdaEnvironment = {
+      PRODUCTS_TABLE: productsTable.tableName,
+      STOCKS_TABLE: stocksTable.tableName,
+      REGION: cdk.Stack.of(this).region,
+    };
+
     const getProductsList = new lambda.Function(this, 'GetProductsListHandler', {
       runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset('lambda'),
       handler: 'getProductsList.handler',
-      memorySize: 128,
       timeout: cdk.Duration.seconds(30),
+      environment: lambdaEnvironment,
+      initialPolicy: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ['dynamodb:Scan', 'dynamodb:GetItem'],
+          resources: [productsTable.tableArn, stocksTable.tableArn],
+        }),
+      ],
     });
 
     const getProductById = new lambda.Function(this, 'GetProductByIdHandler', {
       runtime: lambda.Runtime.NODEJS_18_X,
       code: lambda.Code.fromAsset('lambda'),
       handler: 'getProductById.handler',
-      memorySize: 128,
       timeout: cdk.Duration.seconds(30),
+      environment: lambdaEnvironment,
+      initialPolicy: [
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ['dynamodb:Scan', 'dynamodb:GetItem'],
+          resources: [productsTable.tableArn, stocksTable.tableArn],
+        }),
+      ],
     });
+
+    productsTable.grantReadData(getProductsList);
+    stocksTable.grantReadData(getProductsList);
+    productsTable.grantReadData(getProductById);
+    stocksTable.grantReadData(getProductById);
 
     const api = new apigateway.RestApi(this, 'ProductServiceApi', {
       restApiName: 'Product Service API',
