@@ -3,6 +3,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import { Construct } from 'constructs';
 
 export class ImportServiceStack extends cdk.Stack {
@@ -25,6 +26,15 @@ export class ImportServiceStack extends cdk.Stack {
       },
     });
 
+    const importFileParser = new lambda.Function(this, 'ImportFileParser', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'importFileParser.handler',
+      code: lambda.Code.fromAsset('lambda'),
+      environment: {
+        BUCKET_NAME: importBucket.bucketName,
+      },
+    });
+
     const bucketPolicy = new s3.BucketPolicy(this, 'ImportServiceBucketPolicy', {
       bucket: importBucket,
     });
@@ -42,6 +52,12 @@ export class ImportServiceStack extends cdk.Stack {
       }),
     );
 
+    // Add S3 notification for the uploaded folder
+    importBucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(importFileParser), {
+      prefix: 'uploaded/', // Only trigger for objects in the uploaded folder
+    });
+
+    importBucket.grantRead(importFileParser);
     importBucket.grantReadWrite(importProductsFile);
 
     const api = new apigateway.RestApi(this, 'ImportApi', {
