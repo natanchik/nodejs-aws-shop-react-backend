@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -9,6 +10,12 @@ import { Construct } from 'constructs';
 export class ImportServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    const catalogItemsQueue = sqs.Queue.fromQueueArn(
+      this,
+      'CatalogItemsQueue',
+      `arn:aws:sqs:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:catalogItemsQueue`,
+    );
 
     const importBucket = s3.Bucket.fromBucketName(
       this,
@@ -34,10 +41,13 @@ export class ImportServiceStack extends cdk.Stack {
       code: lambda.Code.fromAsset('lambda'),
       environment: {
         BUCKET_NAME: importBucket.bucketName,
+        SQS_URL: catalogItemsQueue.queueUrl,
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
     });
+
+    catalogItemsQueue.grantSendMessages(importFileParser);
 
     const bucketPolicy = new s3.BucketPolicy(this, 'ImportServiceBucketPolicy', {
       bucket: importBucket,

@@ -4,6 +4,10 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 
 export class ProductsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -73,6 +77,59 @@ export class ProductsStack extends cdk.Stack {
       description: 'API Gateway URL',
     });
 
+    // SQS, SNS
+    const createProductTopic = new sns.Topic(this, 'CreateProductTopic', {
+      topicName: 'createProductTopic',
+    });
+
+    createProductTopic.addSubscription(
+      new subscriptions.EmailSubscription('expensive@example.com', {
+        filterPolicy: {
+          price: sns.SubscriptionFilter.numericFilter({
+            greaterThanOrEqualTo: 100,
+          }),
+        },
+      }),
+    );
+
+    createProductTopic.addSubscription(
+      new subscriptions.EmailSubscription('regular@example.com', {
+        filterPolicy: {
+          price: sns.SubscriptionFilter.numericFilter({
+            lessThan: 100,
+          }),
+        },
+      }),
+    );
+
+    const catalogItemsQueue = new sqs.Queue(this, 'CatalogItemsQueue', {
+      queueName: 'catalogItemsQueue',
+      visibilityTimeout: cdk.Duration.seconds(30),
+    });
+
+    const catalogBatchProcess = new lambda.Function(this, 'CatalogBatchProcess', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'catalogBatchProcess.handler',
+      code: lambda.Code.fromAsset('lambda'),
+      environment: {
+        PRODUCTS_TABLE: productsTable.tableName,
+        STOCKS_TABLE: stocksTable.tableName,
+        SNS_TOPIC_ARN: createProductTopic.topicArn,
+      },
+    });
+
+    productsTable.grantWriteData(catalogBatchProcess);
+    stocksTable.grantWriteData(catalogBatchProcess);
+    createProductTopic.grantPublish(catalogBatchProcess);
+
+    // Add SQS trigger to lambda
+    catalogBatchProcess.addEventSource(
+      new lambda_event_sources.SqsEventSource(catalogItemsQueue, {
+        batchSize: 5,
+      }),
+    );
+
+    // Documentation
     const addSwagger = new lambda.Function(this, 'SwaggerHandler', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'swagger.handler',
