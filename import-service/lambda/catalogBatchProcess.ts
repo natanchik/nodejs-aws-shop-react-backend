@@ -53,6 +53,12 @@ export const handler = async (event: SQSEvent) => {
           message: `Successfully created ${createdProducts.length} products`,
           products: createdProducts,
         }),
+        MessageAttributes: {
+          price: {
+            DataType: 'Number',
+            StringValue: createdProducts[0].price.toString(),
+          },
+        },
       }),
     );
 
