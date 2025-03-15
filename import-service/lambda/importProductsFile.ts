@@ -28,8 +28,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       };
     }
 
-    const bucketName = 'rss-nodejs-aws-shop-react-backend-import-service';
-    const folderName = 'uploaded';
+    const bucketName = process.env.BUCKET_NAME; // 'rss-nodejs-aws-shop-react-backend-import-service';
+    const folderName = process.env.UPLOADED_FOLDER; // 'uploaded';
     const key = `${folderName}/${fileName}`;
 
     const command = new PutObjectCommand({

@@ -38,7 +38,7 @@ describe('importFileParser lambda', () => {
       ],
     } as any;
 
-    const response = await handler(event, {} as any, () => {});
+    const response = await handler(event);
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe('CSV processing completed');
@@ -64,7 +64,7 @@ describe('importFileParser lambda', () => {
       ],
     } as any;
 
-    const response = await handler(event, {} as any, () => {});
+    const response = await handler(event);
 
     expect(response.statusCode).toBe(500);
     expect(JSON.parse(response.body)).toEqual({
@@ -94,6 +94,6 @@ describe('importFileParser lambda', () => {
       ],
     } as any;
 
-    await expect(handler(event, {} as any, () => {})).rejects.toThrow('Stream error');
+    await expect(handler(event)).rejects.toThrow('Stream error');
   });
 });
