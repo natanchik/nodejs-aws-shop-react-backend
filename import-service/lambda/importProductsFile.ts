@@ -1,10 +1,10 @@
-import { APIGatewayProxyHandler } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const s3Client = new S3Client({});
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
     const fileName = event.queryStringParameters?.name;
 
@@ -15,6 +15,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
           'Access-Control-Allow-Origin': '*',
         },
         body: JSON.stringify({ message: 'File name is required' }),
+      };
+    }
+
+    if (!fileName.toLowerCase().endsWith('.csv')) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ message: 'Only CSV files are allowed' }),
       };
     }
 

@@ -24,6 +24,8 @@ export class ImportServiceStack extends cdk.Stack {
         BUCKET_NAME: importBucket.bucketName,
         UPLOADED_FOLDER: 'uploaded',
       },
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
     });
 
     const importFileParser = new lambda.Function(this, 'ImportFileParser', {
@@ -33,6 +35,8 @@ export class ImportServiceStack extends cdk.Stack {
       environment: {
         BUCKET_NAME: importBucket.bucketName,
       },
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
     });
 
     const bucketPolicy = new s3.BucketPolicy(this, 'ImportServiceBucketPolicy', {

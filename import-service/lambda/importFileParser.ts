@@ -1,5 +1,5 @@
 import { S3Event, Handler } from 'aws-lambda';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import csv = require('csv-parser');
 import { Readable } from 'stream';
 
@@ -20,29 +20,64 @@ export const handler: Handler<S3Event> = async (event) => {
       }),
     );
 
-    if (Body instanceof Readable) {
-      await new Promise((resolve, reject) => {
-        Body.pipe(csv())
-          .on('data', (data) => {
-            console.log('Parsed CSV row:', JSON.stringify(data));
-          })
-          .on('error', (error) => {
-            console.error('Error parsing CSV:', error);
-            reject(error);
-          })
-          .on('end', () => {
-            console.log('Finished processing CSV file');
-            resolve(null);
-          });
-      });
+    if (!(Body instanceof Readable)) {
+      throw new Error('Invalid file stream');
     }
+
+    const results: any[] = [];
+
+    await new Promise((resolve, reject) => {
+      Body.pipe(csv())
+        .on('data', (data: any) => {
+          console.log('Parsed CSV row:', JSON.stringify(data));
+          results.push(data);
+        })
+        .on('end', async () => {
+          try {
+            // Move file to parsed folder
+            const newKey = key.replace('uploaded', 'parsed');
+            await s3Client.send(
+              new CopyObjectCommand({
+                Bucket: bucket,
+                CopySource: `${bucket}/${key}`,
+                Key: newKey,
+              }),
+            );
+
+            await s3Client.send(
+              new DeleteObjectCommand({
+                Bucket: bucket,
+                Key: key,
+              }),
+            );
+
+            console.log('File processed and moved successfully');
+            resolve(true);
+          } catch (error) {
+            reject(error);
+          }
+        })
+        .on('error', reject);
+    });
 
     return {
       statusCode: 200,
-      body: 'CSV processing completed',
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({
+        message: 'CSV processing completed',
+        records: results.length,
+      }),
     };
   } catch (error) {
     console.error('Error:', error);
-    throw error;
+    return {
+      statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: JSON.stringify({ message: 'Internal server error' }),
+    };
   }
 };
