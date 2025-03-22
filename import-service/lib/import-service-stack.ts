@@ -28,6 +28,19 @@ export class ImportServiceStack extends cdk.Stack {
       memorySize: 256,
     });
 
+    // Authorizer
+    const basicAuthorizer = lambda.Function.fromFunctionArn(
+      this,
+      'BasicAuthorizer',
+      'arn:aws:lambda:eu-north-1:851725621121:function:AuthorizationServiceStack-BasicAuthorizerHandlerD8-oEnlhFg0sbZc',
+    );
+
+    const authorizer = new apigateway.TokenAuthorizer(this, 'ImportAuthorizer', {
+      handler: basicAuthorizer,
+      identitySource: apigateway.IdentitySource.header('Authorization'),
+      resultsCacheTtl: cdk.Duration.seconds(0),
+    });
+
     const importFileParser = new lambda.Function(this, 'ImportFileParser', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'importFileParser.handler',
@@ -69,11 +82,15 @@ export class ImportServiceStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['*'],
       },
     });
 
     const importResource = api.root.addResource('import');
+
     importResource.addMethod('GET', new apigateway.LambdaIntegration(importProductsFile), {
+      authorizer: authorizer,
+      authorizationType: apigateway.AuthorizationType.CUSTOM,
       requestParameters: {
         'method.request.querystring.name': true,
       },
